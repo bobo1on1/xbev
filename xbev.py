@@ -121,6 +121,7 @@ class EventWindow:
         identifystr = getpass.getuser() + " on " + socket.gethostname();
       except:
         identifystr = "Unknown"
+        pass
 
       self.xbmc = xbmcclient.XBMCClient(name = identifystr, ip = address)
       self.xbmc.connect()
