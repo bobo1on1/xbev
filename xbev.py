@@ -94,7 +94,13 @@ class EventWindow:
     self.label = gtk.Label("Waiting for XBMC")
 
     if (address == ""):
-      self.browser = zeroconf.Browser({"_xbmc-events._udp" : self.service})
+      try:
+        self.browser = zeroconf.Browser({"_xbmc-events._udp" : self.service})
+      except:
+        print "Zeroconf not supported, please pass the host as command-line argument."
+        print "example:"
+        print "  xbev 127.0.0.1"
+        exit()
     else:
       self.connect(address, address)
 
