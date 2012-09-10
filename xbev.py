@@ -73,6 +73,8 @@ translate =\
 ("control_l", "leftctrl"),\
 ("alt_l", "leftalt"),\
 ("scroll_lock", "scrolllock"),\
+("page_up", "pageup"),\
+("page_down", "pagedown"),\
 ("xf86audiomute", "volume_mute"),\
 ("xf86audiolowervolume", "volume_down"),\
 ("xf86audioraisevolume", "volume_up"),\
