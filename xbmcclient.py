@@ -595,7 +595,7 @@ class XBMCClient:
           else:
             down = 1
 
-        packet = PacketBUTTON(map_name=str(map), button_name=str(button), amount=amount, down=down, queue=1, axis=axis)
+        packet = PacketBUTTON(map_name=str(map), button_name=str(button), amount=amount, down=down, queue=1, axis=axis, repeat=0)
         return packet.send(self.sock, self.addr, self.uid)
 
     def send_mouse_position(self, x=0, y=0):
