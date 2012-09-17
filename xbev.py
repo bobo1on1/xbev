@@ -88,6 +88,13 @@ translate =\
 #XF86AudioRecord
 #XF86AudioRewind
 
+errormsg = \
+"""
+Zeroconf not supported, please pass the host as command-line argument.
+example:
+  xbev 127.0.0.1
+"""
+
 class EventWindow:
   def __init__(self, address):
     self.connected = False;
@@ -97,9 +104,12 @@ class EventWindow:
       try:
         self.browser = zeroconf.Browser({"_xbmc-events._udp" : self.service})
       except:
-        print "Zeroconf not supported, please pass the host as command-line argument."
-        print "example:"
-        print "  xbev 127.0.0.1"
+        print errormsg
+        md = gtk.MessageDialog(None, 
+             gtk.DIALOG_DESTROY_WITH_PARENT, gtk.MESSAGE_ERROR, 
+             gtk.BUTTONS_CLOSE, errormsg)
+        md.run()
+        md.destroy()
         exit()
     else:
       self.connect(address, address)
