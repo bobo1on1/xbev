@@ -127,9 +127,9 @@ class EventWindow:
 
   def service(self, found, service):
     if (found == zeroconf.SERVICE_FOUND):
-      self.connect(service["address"], service["hostname"])
+      self.connect(service["address"], service["name"])
     elif (found == zeroconf.SERVICE_LOST):
-      self.disconnect()
+      self.disconnect(service["name"])
 
   def connect(self, address, name):
     if (not self.connected):
@@ -143,11 +143,13 @@ class EventWindow:
       self.xbmc.connect()
       self.connected = True;
       self.label.set_text("Connected to " + name)
+      self.name = name
 
-  def disconnect(self):
-    if (self.connected):
+  def disconnect(self, name = ""):
+    if (self.connected and (name == "" or name == self.name)):
       self.xbmc.close()
       del self.xbmc
+      del self.name
       self.connected = False;
       self.label.set_text("Waiting for XBMC")
 
