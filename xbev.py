@@ -25,6 +25,7 @@ import gobject
 import socket
 import getpass
 import sys
+import json
 
 import xbmcclient
 import zeroconf
@@ -97,12 +98,19 @@ example:
 
 class EventWindow:
   def __init__(self, address):
-    self.connected = False;
-    self.label = gtk.Label("Waiting for XBMC")
+    self.eventconnected = False;
+    self.socketopen = False
+    self.JSONactive = False
+    self.intextentry = False
+
+    self.eventlabel = gtk.Label("Waiting for XBMC")
+    self.eventlabel.show()
+    self.JSONlabel = gtk.Label()
+    self.textentry = gtk.Entry()
 
     if (address == ""):
       try:
-        self.browser = zeroconf.Browser({"_xbmc-events._udp" : self.service})
+        self.browser = zeroconf.Browser({"_xbmc-events._udp" : self.service, "_xbmc-jsonrpc._tcp": self.service})
       except:
         print errormsg
         md = gtk.MessageDialog(None, 
@@ -112,27 +120,42 @@ class EventWindow:
         md.destroy()
         exit()
     else:
-      self.connect(address, address)
+      self.connectevent(address, address)
+      self.JSONactivate(address)
+
+    self.vbox = gtk.VBox()
+
+    self.vbox.pack_start(self.eventlabel)
+    self.vbox.pack_start(self.JSONlabel)
+
+    self.textentry.connect("changed", self.textevent)
+    self.vbox.pack_start(self.textentry)
 
     self.window = gtk.Window(gtk.WINDOW_TOPLEVEL)
     self.window.set_title("xbev");
     self.window.connect("destroy", self.destroy)
-    self.window.connect("key-press-event", self.event)
-    self.window.connect("key-release-event", self.event)
+    self.window.connect("key-press-event", self.keyevent)
+    self.window.connect("key-release-event", self.keyevent)
+    self.window.add(self.vbox)
     self.window.show()
-    self.window.add(self.label)
-    self.label.show();
+    self.vbox.show()
 
     gobject.timeout_add_seconds(30, self.ping)
 
   def service(self, found, service):
-    if (found == zeroconf.SERVICE_FOUND):
-      self.connect(service["address"], service["name"])
-    elif (found == zeroconf.SERVICE_LOST):
-      self.disconnect(service["name"])
+    if (service["type"] == "_xbmc-events._udp"):
+      if (found == zeroconf.SERVICE_FOUND):
+        self.connectevent(service["hostname"], service["name"])
+      elif (found == zeroconf.SERVICE_LOST):
+        self.disconnectevent(service["name"])
+    elif(service["type"] == "_xbmc-jsonrpc._tcp"):
+      if (found == zeroconf.SERVICE_FOUND):
+        self.JSONactivate(service["hostname"], service["name"])
+      elif (found == zeroconf.SERVICE_LOST):
+        self.JSONdeactivate(service["name"])
 
-  def connect(self, address, name):
-    if (not self.connected):
+  def connectevent(self, address, name):
+    if (not self.eventconnected):
       try:
         identifystr = getpass.getuser() + " on " + socket.gethostname();
       except:
@@ -141,34 +164,122 @@ class EventWindow:
 
       self.xbmc = xbmcclient.XBMCClient(name = identifystr, ip = address)
       self.xbmc.connect()
-      self.connected = True;
-      self.label.set_text("Connected to " + name)
-      self.name = name
+      self.eventconnected = True;
+      self.eventlabel.set_text("Connected to " + name)
+      self.eventname = name
 
-  def disconnect(self, name = ""):
-    if (self.connected and (name == "" or name == self.name)):
+  def disconnectevent(self, name = ""):
+    if (self.eventconnected and (name == "" or name == self.eventname)):
       self.xbmc.close()
       del self.xbmc
-      del self.name
-      self.connected = False;
-      self.label.set_text("Waiting for XBMC")
+      del self.eventname
+      self.eventconnected = False;
+      self.eventlabel.set_text("Waiting for XBMC")
+
+  def JSONactivate(self, address, name = ""):
+    if (not self.JSONactive):
+      self.JSONactive = True
+      self.JSONaddress = address
+      self.JSONname = name
+      self.connectJSON()
+
+  def JSONdeactivate(self, name):
+    if (self.JSONactive and self.JSONname == name):
+      self.disconnectJSON()
+      self.JSONactive = False
+      del self.JSONaddress
+      del self.JSONname
+
+  def connectJSON(self):
+    if (self.JSONactive and not self.socketopen):
+      try:
+        self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.socket.connect((self.JSONaddress, 9090))
+        self.socketopen = True
+        self.JSONlabel.hide()
+        gobject.io_add_watch(self.socket.fileno(), gobject.IO_IN, self.parseJSON)
+      except socket.error as e:
+        self.JSONlabel.set_text("JSON-RPC: " + e[1])
+        self.JSONlabel.show()
+        self.socketopen = True
+        self.disconnectJSON()
+        gobject.timeout_add_seconds(1, self.connectJSON)
+        pass
+
+    return False
+
+  def disconnectJSON(self):
+    self.inputfinished()
+    if (self.socketopen):
+      self.socket.close()
+      del self.socket
+      self.socketopen = False
+
+  def parseJSON(self, source, condition):
+    if (condition == gobject.IO_IN):
+      try:
+        jsondata = json.load(self)
+        if (jsondata["method"] == "Input.OnInputRequested"):
+          self.inputrequested(jsondata["params"]["data"]["value"])
+        elif (jsondata["method"] == "Input.OnInputFinished"):
+          self.inputfinished()
+      except:
+        pass
+
+    return self.socketopen
+
+  def read(self):
+    data = self.socket.recv(1500)
+    if (len(data) == 0):
+      self.disconnectJSON()
+      self.connectJSON()
+
+    return data
+
+#{ "jsonrpc" : "2.0", "method" : "Input.SendText", "params" : {"text" : "test", "done" : false}}
+
+  def sendJSON(self, inputdone):
+    if (self.socketopen):
+      jsondict = dict(jsonrpc = "2.0", method = "Input.SendText", params = dict(text = self.textentry.get_text(), done = inputdone))
+      self.socket.send(json.dumps(jsondict))
+
+  def inputrequested(self, text):
+    self.intextentry = True
+    self.textentry.show()
+    self.textentry.grab_focus()
+#set the text after grabbing focus, since when grabbing focus, all text will be selected
+    self.textentry.set_text(text)
+    self.textentry.set_position(len(text))
+
+  def inputfinished(self):
+    self.intextentry = False
+    self.textentry.hide()
 
   def destroy(self, widget, data=None):
-    self.disconnect()
+    self.disconnectevent()
+    self.disconnectJSON()
     gtk.main_quit()
 
-  def event(self, widget, event):
-    if (self.connected and (event.type == gtk.gdk.KEY_PRESS or event.type == gtk.gdk.KEY_RELEASE)):
+  def keyevent(self, widget, event):
+    if (event.type == gtk.gdk.KEY_PRESS or event.type == gtk.gdk.KEY_RELEASE):
       keyvalstr = gtk.gdk.keyval_name(event.keyval).lower();
-      for i in translate:
-        if (i[0] == keyvalstr):
-          keyvalstr = i[1]
-          break
+      if (self.intextentry and keyvalstr != "escape"):
+        if (event.type == gtk.gdk.KEY_PRESS and keyvalstr == "return"):
+          if (keyvalstr == "return"):
+            self.sendJSON(True)
+      elif (self.eventconnected):
+        for i in translate:
+          if (i[0] == keyvalstr):
+            keyvalstr = i[1]
+            break
 
-      self.xbmc.send_button_state("KB", keyvalstr, 0, event.type == gtk.gdk.KEY_PRESS)
+        self.xbmc.send_button_state("KB", keyvalstr, 0, event.type == gtk.gdk.KEY_PRESS)
+
+  def textevent(self, editable):
+    self.sendJSON(False)
 
   def ping(self):
-    if (self.connected):
+    if (self.eventconnected):
       self.xbmc.ping();
     return True
 
