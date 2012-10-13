@@ -269,8 +269,7 @@ class EventWindow:
       keyvalstr = gtk.gdk.keyval_name(event.keyval).lower();
       if (self.intextentry and keyvalstr != "escape"):
         if (event.type == gtk.gdk.KEY_PRESS and keyvalstr == "return"):
-          if (keyvalstr == "return"):
-            self.sendJSON(True)
+          self.sendJSON(True)
       elif (self.eventconnected):
         for i in translate:
           if (i[0] == keyvalstr):
