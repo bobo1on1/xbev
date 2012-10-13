@@ -107,6 +107,26 @@ class EventWindow:
     self.eventlabel.show()
     self.JSONlabel = gtk.Label()
     self.textentry = gtk.Entry()
+    self.textentry.connect("changed", self.textevent)
+
+    self.vbox = gtk.VBox()
+    self.vbox.pack_start(self.eventlabel)
+    self.vbox.pack_start(self.JSONlabel)
+    self.vbox.pack_start(self.textentry)
+    self.vbox.show()
+
+    self.window = gtk.Window(gtk.WINDOW_TOPLEVEL)
+    self.window.set_default_size(200, 200)
+    self.window.set_title("xbev");
+    self.window.connect("destroy", self.destroy)
+    self.window.connect("key-press-event", self.keyevent)
+    self.window.connect("key-release-event", self.keyevent)
+    self.window.add(self.vbox)
+    self.window.show()
+
+#process gtk events to make the window show
+    while gtk.events_pending():
+       gtk.main_iteration(False)
 
     if (address == ""):
       try:
@@ -122,23 +142,6 @@ class EventWindow:
     else:
       self.connectevent(address, address)
       self.JSONactivate(address)
-
-    self.vbox = gtk.VBox()
-
-    self.vbox.pack_start(self.eventlabel)
-    self.vbox.pack_start(self.JSONlabel)
-
-    self.textentry.connect("changed", self.textevent)
-    self.vbox.pack_start(self.textentry)
-
-    self.window = gtk.Window(gtk.WINDOW_TOPLEVEL)
-    self.window.set_title("xbev");
-    self.window.connect("destroy", self.destroy)
-    self.window.connect("key-press-event", self.keyevent)
-    self.window.connect("key-release-event", self.keyevent)
-    self.window.add(self.vbox)
-    self.window.show()
-    self.vbox.show()
 
     gobject.timeout_add_seconds(30, self.ping)
 
