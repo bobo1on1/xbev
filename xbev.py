@@ -184,6 +184,7 @@ class EventWindow:
       self.connectJSON()
 
   def JSONdeactivate(self, name):
+    self.JSONlabel.hide()
     if (self.JSONactive and self.JSONname == name):
       self.disconnectJSON()
       self.JSONactive = False
