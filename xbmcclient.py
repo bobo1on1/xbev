@@ -1,4 +1,5 @@
-#!/usr/bin/python
+#!/usr/bin/env python2
+
 # -*- coding: utf-8 -*-
 
 #   Copyright (C) 2008-2009 Team XBMC http://www.xbmc.org
