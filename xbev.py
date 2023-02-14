@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 
 #
 # xbev
@@ -17,12 +17,14 @@
 # You should have received a copy of the GNU General Public License along
 # with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
-
-import pygtk
-pygtk.require('2.0')
+from gi import pygtkcompat
+pygtkcompat.enable()
+pygtkcompat.enable_gtk(version='3.0')
+from gi.repository import GLib
 import gtk
 import gobject
 import socket
+import errno
 import getpass
 import sys
 import json
@@ -103,7 +105,7 @@ class EventWindow:
     self.JSONactive = False
     self.intextentry = False
 
-    self.eventlabel = gtk.Label("Waiting for XBMC")
+    self.eventlabel = gtk.Label(label="Waiting for XBMC")
     self.eventlabel.show()
     self.JSONlabel = gtk.Label()
     self.textentry = gtk.Entry()
@@ -115,7 +117,7 @@ class EventWindow:
     self.vbox.pack_start(self.textentry)
     self.vbox.show()
 
-    self.window = gtk.Window(gtk.WINDOW_TOPLEVEL)
+    self.window = gtk.Window(type=gtk.WINDOW_TOPLEVEL)
     self.window.set_default_size(200, 200)
     self.window.set_title("xbev");
     self.window.connect("destroy", self.destroy)
@@ -126,13 +128,13 @@ class EventWindow:
 
 #process gtk events to make the window show
     while gtk.events_pending():
-       gtk.main_iteration(False)
+       gtk.main_iteration()
 
     if (address == ""):
       try:
         self.browser = zeroconf.Browser({"_xbmc-events._udp" : self.service, "_xbmc-jsonrpc._tcp": self.service})
       except:
-        print errormsg
+        print(errormsg)
         md = gtk.MessageDialog(None, 
              gtk.DIALOG_DESTROY_WITH_PARENT, gtk.MESSAGE_ERROR, 
              gtk.BUTTONS_CLOSE, errormsg)
@@ -143,7 +145,7 @@ class EventWindow:
       self.connectevent(address, address)
       self.JSONactivate(address)
 
-    gobject.timeout_add_seconds(30, self.ping)
+    GLib.timeout_add_seconds(30, self.ping)
 
   def service(self, found, service):
     if (service["type"] == "_xbmc-events._udp"):
@@ -197,18 +199,17 @@ class EventWindow:
   def connectJSON(self):
     if (self.JSONactive and not self.socketopen):
       try:
-        self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.socket.connect((self.JSONaddress, 9090))
+        self.socket = socket.create_connection((self.JSONaddress, 9090))
         self.socketopen = True
         self.JSONlabel.hide()
-        gobject.io_add_watch(self.socket.fileno(), gobject.IO_IN, self.parseJSON)
+        GLib.io_add_watch(self.socket.fileno(), GLib.IO_IN, self.parseJSON)
       except socket.error as e:
-        self.JSONlabel.set_text("JSON-RPC: " + e[1])
+        print(e)
+        self.JSONlabel.set_text("JSON-RPC: " + e.args[1])
         self.JSONlabel.show()
         self.socketopen = True
         self.disconnectJSON()
-        gobject.timeout_add_seconds(1, self.connectJSON)
-        pass
+        GLib.timeout_add_seconds(1, self.connectJSON)
 
     return False
 
@@ -220,7 +221,7 @@ class EventWindow:
       self.socketopen = False
 
   def parseJSON(self, source, condition):
-    if (condition == gobject.IO_IN):
+    if (condition == GLib.IO_IN):
       try:
         jsondata = json.load(self)
         if (jsondata["method"] == "Input.OnInputRequested"):
@@ -275,7 +276,7 @@ class EventWindow:
           if (i[0] == keyvalstr):
             keyvalstr = i[1]
             break
-
+        print(keyvalstr)
         self.xbmc.send_button_state("KB", keyvalstr, 0, event.type == gtk.gdk.KEY_PRESS)
 
   def textevent(self, editable):
