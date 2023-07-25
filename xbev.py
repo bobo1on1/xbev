@@ -246,7 +246,7 @@ class EventWindow:
   def sendJSON(self, inputdone):
     if (self.socketopen):
       jsondict = dict(jsonrpc = "2.0", method = "Input.SendText", params = dict(text = self.textentry.get_text(), done = inputdone))
-      self.socket.send(json.dumps(jsondict))
+      self.socket.send(json.dumps(jsondict).encode('utf-8'))
 
   def inputrequested(self, text):
     self.intextentry = True
