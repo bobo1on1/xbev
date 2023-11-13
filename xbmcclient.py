@@ -97,7 +97,7 @@ ACTION_BUTTON      = 0x02
 
 def format_string(msg):
     """ """
-    return msg + "\0"
+    return msg + b"\0"
 
 def format_uint32(num):
     """ """
@@ -140,15 +140,15 @@ class Packet:
          -----------------------------
     """
     def __init__(self):
-        self.sig = "XBMC"
+        self.sig = b"XBMC"
         self.minver = 0
         self.majver = 2
         self.seq = 1
         self.maxseq = 1
         self.payloadsize = 0
         self.uid = UNIQUE_IDENTIFICATION
-        self.reserved = "\0" * 10
-        self.payload = ""
+        self.reserved = b"\0" * 10
+        self.payload = b""
         return
 
 
@@ -192,8 +192,8 @@ class Packet:
         if packettype < 0:
             packettype = self.packettype
         header = self.sig
-        header += chr(self.majver)
-        header += chr(self.minver)
+        header += bytes([self.majver])
+        header += bytes([self.minver])
         header += format_uint16(packettype)
         header += format_uint32(seq)
         header += format_uint32(maxseq)
@@ -252,7 +252,8 @@ class Packet:
         for a in range ( 0, self.num_packets() ):
             try:
                 sock.sendto(self.get_udp_message(a+1), addr)
-            except:
+            except Exception as e:
+                print(e)
                 return False
         return True
 
@@ -274,8 +275,8 @@ class PacketHELO (Packet):
         Packet.__init__(self)
         self.packettype = PT_HELO
         self.icontype = icon_type
-        self.set_payload ( format_string(devicename)[0:128] )
-        self.append_payload( chr (icon_type) )
+        self.set_payload ( format_string(bytes(devicename, encoding='utf8'))[0:128] )
+        self.append_payload( bytes ([icon_type]) )
         self.append_payload( format_uint16 (0) ) # port no
         self.append_payload( format_uint32 (0) ) # reserved1
         self.append_payload( format_uint32 (0) ) # reserved2
@@ -303,7 +304,7 @@ class PacketNOTIFICATION (Packet):
         self.message = message
         self.set_payload ( format_string(title) )
         self.append_payload( format_string(message) )
-        self.append_payload( chr (icon_type) )
+        self.append_payload( bytes ([icon_type]) )
         self.append_payload( format_uint32 (0) ) # reserved
         if icon_type != ICON_NONE and icon_file:
             self.append_payload( file(icon_file).read() )
@@ -378,8 +379,8 @@ class PacketBUTTON (Packet):
         self.set_payload ( format_uint16(self.code) )
         self.append_payload( format_uint16(self.flags) )
         self.append_payload( format_uint16(self.amount) )
-        self.append_payload( format_string (map_name) )
-        self.append_payload( format_string (button_name) )
+        self.append_payload( format_string (bytes(map_name, encoding='utf8')) )
+        self.append_payload( format_string (bytes(button_name, encoding='utf8')) )
 
 class PacketMOUSE (Packet):
     """A MOUSE packet
@@ -397,7 +398,7 @@ class PacketMOUSE (Packet):
         Packet.__init__(self)
         self.packettype = PT_MOUSE
         self.flags = MS_ABSOLUTE
-        self.append_payload( chr (self.flags) )
+        self.append_payload( bytes ([self.flags]) )
         self.append_payload( format_uint16(x) )
         self.append_payload( format_uint16(y) )
 
@@ -436,10 +437,10 @@ class PacketLOG (Packet):
         """
         Packet.__init__(self)
         self.packettype = PT_LOG
-        self.append_payload( chr (loglevel) )
+        self.append_payload( bytes ([loglevel]) )
         self.append_payload( format_string(logmessage) )
         if (autoprint):
-          print logmessage
+          print(logmessage)
 
 class PacketACTION (Packet):
     """An ACTION packet
@@ -456,7 +457,7 @@ class PacketACTION (Packet):
         """
         Packet.__init__(self)
         self.packettype = PT_ACTION
-        self.append_payload( chr (actiontype) )
+        self.append_payload( bytes ([actiontype]) )
         self.append_payload( format_string(actionmessage) )
 
 ######################################################################
@@ -479,7 +480,7 @@ class XBMCClient:
         self.icon_type = self._get_icon_type(icon_file)
         self.ip = ip
         self.port = 9777
-        self.sock = socket(AF_INET,SOCK_DGRAM)
+        self.sock = socket(AF_INET6, SOCK_DGRAM)
         if broadcast:
             self.sock.setsockopt(SOL_SOCKET, SO_BROADCAST, 1)
         self.uid = uid
@@ -496,7 +497,12 @@ class XBMCClient:
             self.port = int(port)
         self.addr = (self.ip, self.port)
         packet = PacketHELO(self.name, self.icon_type, self.icon_file)
-        return packet.send(self.sock, self.addr, self.uid)
+        try:
+            rv = packet.send(self.sock, self.addr, self.uid)
+        except socket.error as e:
+            self.sock = socket(AF_INET, SOCK_DGRAM)
+            rv = packet.send(self.sock, self.addr, self.uid)
+        return rv
 
 
     def close(self):
